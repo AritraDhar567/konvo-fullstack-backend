@@ -49,11 +49,7 @@ const signup = async (req, res) => {
     const { email, password, name } = req.body;
 
     // Check if user already exists
-    const { data: existingUser, error: checkError } = await req.supabase
-      .from('users')
-      .select('*')
-      .eq('email', email)
-      .single();
+    const { data: existingUser, error: checkError } = await req.supabase .from('users') .select('*') .eq('email', email) .maybeSingle();
 
     if (existingUser) {
       return res.status(400).json({ message: 'Email already registered' });
@@ -76,9 +72,7 @@ const signup = async (req, res) => {
       .select()
       .single();
 
-    if (createError) {
-      return res.status(500).json({ message: 'Failed to create user' });
-    }
+    if (createError) { console.log(createError); return res.status(500).json({ message: 'Failed to create user', error: createError.message }); }
 
     // Generate token
     const token = generateToken(user.id, user.email);

@@ -316,7 +316,6 @@ Errors return appropriate HTTP status codes:
 
 ✅ Password hashing with bcryptjs
 ✅ JWT token authentication
-✅ OTP verification for added security
 ✅ Input validation and sanitization
 ✅ User-specific data isolation
 ✅ CORS enabled

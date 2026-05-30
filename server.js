@@ -2,7 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const { createClient } = require('@supabase/supabase-js');
-
+const os = require('os');
 // Load environment variables
 dotenv.config();
 
@@ -54,8 +54,26 @@ app.use(errorHandler);
 // Start server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log(`Environment: ${process.env.NODE_ENV}`);
+  const networkInterfaces = os.networkInterfaces();
+
+  let localIP = 'localhost';
+
+  for (const interfaceName in networkInterfaces) {
+    for (const iface of networkInterfaces[interfaceName]) {
+      if (iface.family === 'IPv4' && !iface.internal) {
+        localIP = iface.address;
+        break;
+      }
+    }
+  }
+
+  console.log(`\n🚀 Server running successfully`);
+  console.log(`📍 Local:   http://localhost:${PORT}`);
+  console.log(`🌐 Network: http://${localIP}:${PORT}`);
+  console.log(`🩺 Health:  http://${localIP}:${PORT}/api/health`);
+  console.log(`🔐 Auth:    http://${localIP}:${PORT}/api/auth`);
+  console.log(`📁 Projects:http://${localIP}:${PORT}/api/projects`);
+  console.log(`✅ Environment: ${process.env.NODE_ENV}\n`);
 });
 
 module.exports = app;
