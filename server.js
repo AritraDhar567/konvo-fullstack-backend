@@ -76,4 +76,21 @@ app.listen(PORT, () => {
   console.log(`✅ Environment: ${process.env.NODE_ENV}\n`);
 });
 
+// Keep-Alive Ping Mechanism for Render Free Tier
+const RENDER_EXTERNAL_URL = process.env.RENDER_EXTERNAL_URL;
+if (RENDER_EXTERNAL_URL) {
+  const axios = require('axios');
+  const pingInterval = 10 * 60 * 1000; // 10 minutes
+
+  setInterval(async () => {
+    try {
+      console.log(`[Keep-Alive] Pinging self at ${RENDER_EXTERNAL_URL}/api/health...`);
+      const response = await axios.get(`${RENDER_EXTERNAL_URL}/api/health`);
+      console.log(`[Keep-Alive] Status: ${response.status} - ${response.data.status}`);
+    } catch (error) {
+      console.error(`[Keep-Alive] Error pinging self: ${error.message}`);
+    }
+  }, pingInterval);
+}
+
 module.exports = app;
