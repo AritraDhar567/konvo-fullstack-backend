@@ -19,7 +19,35 @@ const generateToken = (id, email) => {
 // Send email (for OTP)
 const sendEmail = async (email, otp) => {
   try {
-    // 1. If Resend API Key is provided, use Resend HTTP API (works perfectly on Render Free Tier)
+    // 1. If Brevo API Key is provided, use Brevo HTTP API (100% free, domain-free, sends to anyone)
+    if (process.env.BREVO_API_KEY) {
+      const axios = require('axios');
+      await axios.post(
+        'https://api.brevo.com/v3/smtp/email',
+        {
+          sender: {
+            name: 'Konvo Task Manager',
+            email: process.env.EMAIL_FROM || 'bustin567@gmail.com',
+          },
+          to: [
+            {
+              email: email,
+            },
+          ],
+          subject: 'Your OTP for Konvo Task Manager',
+          htmlContent: `<h1>Your OTP: ${otp}</h1><p>This OTP will expire in ${process.env.OTP_EXPIRY || 5} minutes</p>`,
+        },
+        {
+          headers: {
+            'api-key': process.env.BREVO_API_KEY,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+      return true;
+    }
+
+    // 2. If Resend API Key is provided, use Resend HTTP API (requires domain for custom emails)
     if (process.env.RESEND_API_KEY) {
       const axios = require('axios');
       await axios.post(
