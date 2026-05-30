@@ -19,6 +19,28 @@ const generateToken = (id, email) => {
 // Send email (for OTP)
 const sendEmail = async (email, otp) => {
   try {
+    // 1. If Resend API Key is provided, use Resend HTTP API (works perfectly on Render Free Tier)
+    if (process.env.RESEND_API_KEY) {
+      const axios = require('axios');
+      await axios.post(
+        'https://api.resend.com/emails',
+        {
+          from: process.env.EMAIL_FROM || 'onboarding@resend.dev',
+          to: email,
+          subject: 'Your OTP for Konvo Task Manager',
+          html: `<h1>Your OTP: ${otp}</h1><p>This OTP will expire in ${process.env.OTP_EXPIRY || 5} minutes</p>`,
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+      return true;
+    }
+
+    // 2. Fallback to standard SMTP (for local development or paid instances where SMTP ports are open)
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
       port: parseInt(process.env.SMTP_PORT) || 587,
@@ -33,12 +55,12 @@ const sendEmail = async (email, otp) => {
       from: process.env.SMTP_USER,
       to: email,
       subject: 'Your OTP for Konvo Task Manager',
-      html: `<h1>Your OTP: ${otp}</h1><p>This OTP will expire in ${process.env.OTP_EXPIRY} minutes</p>`,
+      html: `<h1>Your OTP: ${otp}</h1><p>This OTP will expire in ${process.env.OTP_EXPIRY || 5} minutes</p>`,
     });
 
     return true;
   } catch (error) {
-    console.error('Email error:', error);
+    console.error('Email error:', error.response?.data || error.message || error);
     return false;
   }
 };
@@ -47,11 +69,13 @@ const sendEmail = async (email, otp) => {
 const signup = async (req, res) => {
   try {
     const { email, password, name } = req.body;
+    console.log(`[AUTH] SIGNUP request received - Email: ${email}, Name: ${name}`);
 
     // Check if user already exists
     const { data: existingUser, error: checkError } = await req.supabase .from('users') .select('*') .eq('email', email) .maybeSingle();
 
     if (existingUser) {
+      console.log(`[AUTH] SIGNUP failed - Email already exists: ${email}`);
       return res.status(400).json({ message: 'Email already registered' });
     }
 
@@ -72,10 +96,14 @@ const signup = async (req, res) => {
       .select()
       .single();
 
-    if (createError) { console.log(createError); return res.status(500).json({ message: 'Failed to create user', error: createError.message }); }
+    if (createError) {
+      console.error(`[AUTH] SIGNUP database insert error:`, createError.message);
+      return res.status(500).json({ message: 'Failed to create user', error: createError.message });
+    }
 
     // Generate token
     const token = generateToken(user.id, user.email);
+    console.log(`[AUTH] SIGNUP success - Registered User ID: ${user.id}`);
 
     res.status(201).json({
       success: true,
@@ -93,6 +121,7 @@ const signup = async (req, res) => {
 const login = async (req, res) => {
   try {
     const { email, password } = req.body;
+    console.log(`[AUTH] LOGIN request received - Email: ${email}`);
 
     // Find user
     const { data: user, error: findError } = await req.supabase
@@ -102,6 +131,7 @@ const login = async (req, res) => {
       .single();
 
     if (!user) {
+      console.log(`[AUTH] LOGIN failed - User not found for email: ${email}`);
       return res.status(401).json({ message: 'Invalid email or password' });
     }
 
@@ -109,11 +139,13 @@ const login = async (req, res) => {
     const isPasswordValid = await bcrypt.compare(password, user.password);
 
     if (!isPasswordValid) {
+      console.log(`[AUTH] LOGIN failed - Invalid password for email: ${email}`);
       return res.status(401).json({ message: 'Invalid email or password' });
     }
 
     // Generate token
     const token = generateToken(user.id, user.email);
+    console.log(`[AUTH] LOGIN success - Logged in User ID: ${user.id}`);
 
     res.status(200).json({
       success: true,
@@ -131,6 +163,7 @@ const login = async (req, res) => {
 const requestOTP = async (req, res) => {
   try {
     const { email } = req.body;
+    console.log(`[AUTH] REQUEST_OTP request received - Email: ${email}`);
 
     // Find user
     const { data: user } = await req.supabase
@@ -140,6 +173,7 @@ const requestOTP = async (req, res) => {
       .single();
 
     if (!user) {
+      console.log(`[AUTH] REQUEST_OTP failed - User not found: ${email}`);
       return res.status(404).json({ message: 'User not found' });
     }
 
@@ -157,20 +191,26 @@ const requestOTP = async (req, res) => {
       .eq('id', user.id);
 
     if (updateError) {
+      console.error(`[AUTH] REQUEST_OTP DB update error:`, updateError.message);
       return res.status(500).json({ message: 'Failed to generate OTP' });
     }
+
+    console.log(`[AUTH] REQUEST_OTP - Code generated: ${otp} (expires ${otpExpiry}). Sending email...`);
 
     // Send OTP via email
     const emailSent = await sendEmail(email, otp);
 
     if (!emailSent) {
+      console.error(`[AUTH] REQUEST_OTP failed - Failed to send email to: ${email}`);
       return res.status(500).json({ message: 'Failed to send OTP email' });
     }
+
+    console.log(`[AUTH] REQUEST_OTP success - OTP sent to inbox of: ${email}`);
 
     res.status(200).json({
       success: true,
       message: 'OTP sent to email successfully',
-      expiresIn: `${process.env.OTP_EXPIRY} minutes`,
+      expiresIn: `${process.env.OTP_EXPIRY || 5} minutes`,
     });
   } catch (error) {
     console.error('Request OTP error:', error);
@@ -182,6 +222,7 @@ const requestOTP = async (req, res) => {
 const verifyOTP = async (req, res) => {
   try {
     const { email, otp } = req.body;
+    console.log(`[AUTH] VERIFY_OTP request received - Email: ${email}, Code: ${otp}`);
 
     // Find user
     const { data: user } = await req.supabase
@@ -191,16 +232,19 @@ const verifyOTP = async (req, res) => {
       .single();
 
     if (!user) {
+      console.log(`[AUTH] VERIFY_OTP failed - User not found: ${email}`);
       return res.status(404).json({ message: 'User not found' });
     }
 
     // Check if OTP is valid
     if (user.otp !== otp) {
+      console.log(`[AUTH] VERIFY_OTP failed - Code mismatch for email: ${email}`);
       return res.status(401).json({ message: 'Invalid OTP' });
     }
 
     // Check if OTP is expired
     if (new Date() > new Date(user.otp_expiry)) {
+      console.log(`[AUTH] VERIFY_OTP failed - Code expired (expiry was ${user.otp_expiry}) for email: ${email}`);
       return res.status(401).json({ message: 'OTP has expired' });
     }
 
@@ -214,10 +258,12 @@ const verifyOTP = async (req, res) => {
       .eq('id', user.id);
 
     if (updateError) {
+      console.error(`[AUTH] VERIFY_OTP failed - Database clear error:`, updateError.message);
       return res.status(500).json({ message: 'Failed to verify OTP' });
     }
 
     const token = generateToken(user.id, user.email);
+    console.log(`[AUTH] VERIFY_OTP success - User ${user.id} logged in successfully via OTP.`);
 
     res.status(200).json({
       success: true,

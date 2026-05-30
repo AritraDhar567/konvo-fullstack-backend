@@ -3,6 +3,7 @@ const createProject = async (req, res) => {
   try {
     const { title, description } = req.body;
     const userId = req.userId;
+    console.log(`[PROJECTS] CREATE request - User ID: ${userId}, Title: "${title}"`);
 
     const { data: project, error } = await req.supabase
       .from('projects')
@@ -18,8 +19,11 @@ const createProject = async (req, res) => {
       .single();
 
     if (error) {
+      console.error(`[PROJECTS] CREATE database error:`, error.message);
       return res.status(500).json({ message: 'Failed to create project' });
     }
+
+    console.log(`[PROJECTS] CREATE success - Project ID: ${project.id} created for User ID: ${userId}`);
 
     res.status(201).json({
       success: true,
@@ -36,6 +40,7 @@ const createProject = async (req, res) => {
 const getUserProjects = async (req, res) => {
   try {
     const userId = req.userId;
+    console.log(`[PROJECTS] GET_USER_PROJECTS request - User ID: ${userId}`);
 
     const { data: projects, error } = await req.supabase
       .from('projects')
@@ -44,8 +49,11 @@ const getUserProjects = async (req, res) => {
       .order('created_at', { ascending: false });
 
     if (error) {
+      console.error(`[PROJECTS] GET_USER_PROJECTS DB error:`, error.message);
       return res.status(500).json({ message: 'Failed to fetch projects' });
     }
+
+    console.log(`[PROJECTS] GET_USER_PROJECTS success - User ID: ${userId}, Count: ${projects.length}`);
 
     res.status(200).json({
       success: true,
@@ -63,6 +71,7 @@ const getProjectById = async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.userId;
+    console.log(`[PROJECTS] GET_BY_ID request - User ID: ${userId}, Project ID: ${id}`);
 
     const { data: project, error } = await req.supabase
       .from('projects')
@@ -72,12 +81,16 @@ const getProjectById = async (req, res) => {
       .single();
 
     if (!project) {
+      console.log(`[PROJECTS] GET_BY_ID failed - Project not found: ${id} for User ID: ${userId}`);
       return res.status(404).json({ message: 'Project not found' });
     }
 
     if (error) {
+      console.error(`[PROJECTS] GET_BY_ID database error:`, error.message);
       return res.status(500).json({ message: 'Failed to fetch project' });
     }
+
+    console.log(`[PROJECTS] GET_BY_ID success - User ID: ${userId}, Project ID: ${id}`);
 
     res.status(200).json({
       success: true,
@@ -95,6 +108,7 @@ const updateProject = async (req, res) => {
     const { id } = req.params;
     const { title, description } = req.body;
     const userId = req.userId;
+    console.log(`[PROJECTS] UPDATE request - User ID: ${userId}, Project ID: ${id}`);
 
     // Check if project belongs to user
     const { data: existingProject } = await req.supabase
@@ -105,6 +119,7 @@ const updateProject = async (req, res) => {
       .single();
 
     if (!existingProject) {
+      console.log(`[PROJECTS] UPDATE failed - Not authorized for Project ID: ${id} (User ID: ${userId})`);
       return res.status(403).json({ message: 'Not authorized to update this project' });
     }
 
@@ -119,8 +134,11 @@ const updateProject = async (req, res) => {
       .single();
 
     if (error) {
+      console.error(`[PROJECTS] UPDATE database error:`, error.message);
       return res.status(500).json({ message: 'Failed to update project' });
     }
+
+    console.log(`[PROJECTS] UPDATE success - Project ID: ${id} updated by User ID: ${userId}`);
 
     res.status(200).json({
       success: true,
@@ -138,6 +156,7 @@ const deleteProject = async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.userId;
+    console.log(`[PROJECTS] DELETE request - User ID: ${userId}, Project ID: ${id}`);
 
     // Check if project belongs to user
     const { data: existingProject } = await req.supabase
@@ -148,6 +167,7 @@ const deleteProject = async (req, res) => {
       .single();
 
     if (!existingProject) {
+      console.log(`[PROJECTS] DELETE failed - Not authorized for Project ID: ${id} (User ID: ${userId})`);
       return res.status(403).json({ message: 'Not authorized to delete this project' });
     }
 
@@ -164,8 +184,11 @@ const deleteProject = async (req, res) => {
       .eq('id', id);
 
     if (error) {
+      console.error(`[PROJECTS] DELETE database error:`, error.message);
       return res.status(500).json({ message: 'Failed to delete project' });
     }
+
+    console.log(`[PROJECTS] DELETE success - Project ID: ${id} deleted by User ID: ${userId}`);
 
     res.status(200).json({
       success: true,
